@@ -1,5 +1,3 @@
-# Copied directly from jfedor's quake 3 proxy https://github.com/jfedor2/quake3-proxy-aimbot
-
 NYT = 256
 
 
@@ -8,7 +6,6 @@ def reverse_bit_order(value):
 
 
 class Node:
-
     def __init__(self, symbol=None, parent=None, left=None, right=None, number=None, weight=0):
         self.symbol = symbol
         self.parent = parent
@@ -19,102 +16,113 @@ class Node:
 
 
 class Huffman:
-
     def __init__(self):
         self.nyt = Node(NYT, number=0)
         self.root = self.nyt
         self.node_for_symbol = {NYT: self.nyt}
         self.adapt = True
         self.nodes = []
-
+    
+    
     def emit_code_for(self, node, buffer, child=None):
         if node.parent:
             self.emit_code_for(node.parent, buffer, node)
         if child:
             buffer.write_bit(0 if child is node.left else 1)
-
+    
+    
     def find_leader(self, node):
         index = node.number
+        
         while index >= 0 and self.nodes[index].weight == node.weight:
             index -= 1
+        
         return self.nodes[index + 1]
-
+    
+    
     def swap_nodes(self, node1, node2):
         self.nodes[node1.number], self.nodes[node2.number] = node2, node1
         node1.number, node2.number = node2.number, node1.number
         node1.parent, node2.parent = node2.parent, node1.parent
-
+        
         for (node_a, node_b) in ((node1, node2), (node2, node1)):
             if node_a.parent.left is node_b:
                 node_a.parent.left = node_a
             else:
                 node_a.parent.right = node_a
-
+    
+    
     def insert(self, symbol):
         node = self.node_for_symbol.get(symbol)
-
+        
         if node is None:
             internal = Node()
             internal.weight = 1
             internal.left = self.nyt
-
+            
             node = Node(symbol)
             node.weight = 1
             node.parent = internal
-
+            
             internal.right = node
-
+            
             internal.parent = self.nyt.parent
             if internal.parent is not None:
                 internal.parent.left = internal
             else:
                 self.root = internal
-
+            
             self.nyt.parent = internal
-
+            
             self.node_for_symbol[symbol] = node
-
+            
             internal.number = len(self.nodes)
             self.nodes.append(internal)
             node.number = len(self.nodes)
             self.nodes.append(node)
             self.nyt.number = len(self.nodes)
-
+            
             node = internal.parent
-
+        
         while node is not None:
             leader = self.find_leader(node)
-
+            
             if leader is not node and leader is not node.parent:
                 self.swap_nodes(node, leader)
-
+            
             node.weight += 1
             node = node.parent
-
+    
+    
     def encode(self, symbol, buffer):
         if symbol in self.node_for_symbol:
             self.emit_code_for(self.node_for_symbol[symbol], buffer)
         else:
             if not self.adapt:
                 raise Exception("new symbol in non-adapting mode")
+            
             self.emit_code_for(self.nyt, buffer)
             buffer.write_bits(symbol, 8)
         if self.adapt:
             self.insert(symbol)
-
+    
+    
     def decode(self, buffer, length):
         output = b''
         node = self.root
+        
         while len(output) < length:
             if node.symbol is not None:
                 if node.symbol == NYT:
                     if not self.adapt:
                         raise Exception("reached NYT in non-adapting mode")
+                    
                     value = reverse_bit_order(buffer.read_raw_bits(8))
                     output += bytes([value])
                     self.insert(value)
                 else:
                     output += bytes([node.symbol])
+                    
                     if self.adapt:
                         self.insert(node.symbol)
                 node = self.root
@@ -123,13 +131,16 @@ class Huffman:
                     node = node.left
                 else:
                     node = node.right
+        
         return output
-
+    
+    
     def init_from_saved_tree(self, tree):
         for i in range(len(tree)):
             self.nodes.append(Node(number=i))
-        # NYT is conceptually at the end of the list
+        
         self.nyt.number = len(self.nodes)
+        
         for i, n in enumerate(tree):
             if n <= 0:
                 self.nodes[i].symbol = -n
@@ -139,18 +150,17 @@ class Huffman:
                 self.nodes[i].left.parent = self.nodes[i]
                 self.nodes[i].right = self.nodes[n - 1]
                 self.nodes[i].right.parent = self.nodes[i]
-        # the weights weren't saved so we must switch to non-adaptive mode
+        
         self.adapt = False
         self.root = self.nodes[0]
-
+    
+    
     def save_tree(self):
-        return [-n.symbol if n.symbol is not None else n.left.number for n in self.nodes]
+        return [-n.symbol if n.symbol is not None 
+                else n.left.number 
+                for n in self.nodes]
 
 
-# negative value (and zero) means leaf, value is -symbol
-# positive value means internal node, value is index ("number") of left child
-# (right child's index is always value-1)
-# that is enough to reconstruct the tree if we don't care about the weights
 SAVED_TREE = [
     2, 4, 6, 8, 10, 0, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48,
     50, 52, 54, 56, -1, 58, 60, 62, 64, 66, -8, 68, 70, 72, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92,

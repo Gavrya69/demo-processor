@@ -1,5 +1,5 @@
-# Copied and reduced directly from jfedor's quake 3 proxy https://github.com/jfedor2/quake3-proxy-aimbot
 import collections
+
 
 GENTITYNUM_BITS = 10
 FLOAT_INT_BITS = 13
@@ -14,17 +14,16 @@ PACKET_MASK = PACKET_BACKUP - 1
 MSG_SEQUENCE_LEN = 4
 MSG_LENGTH_LEN = 4
 BLOCK_HEADER_BYTES = MSG_SEQUENCE_LEN + MSG_LENGTH_LEN
-MSG_TYPES = {
-    0: 'bad',
-    1: 'nop',
-    2: 'gamestate',
-    3: 'cofigstring',
-    4: 'baseline',
-    5: 'servercommand',
-    6: 'download',
-    7: 'snapshot',
-    8: 'eof'
-}
+
+SVC_BAD = 0
+SVC_NOP = 1
+SVC_GAMESTATE = 2
+SVC_CONFIGSTRING = 3
+SVC_BASELINE = 4
+SVC_SERVERCOMMAND = 5
+SVC_DOWNLOAD = 6
+SVC_SNAPSHOT = 7
+SVC_EOF = 8
 
 PRESS_NUMS = {
     "_": 512,
@@ -38,7 +37,9 @@ PRESS_NUMS = {
     " ": 0
 }
 
+
 FieldDefinition = collections.namedtuple("FieldDefinition", ["name", "bits"])
+
 
 PLAYERSTATE_FIELDS = [
     FieldDefinition("commandTime", 32),
@@ -90,6 +91,7 @@ PLAYERSTATE_FIELDS = [
     FieldDefinition("jumppad_ent", 10),
     FieldDefinition("loopSound", 16),
 ]
+
 
 ENTITY_FIELDS = [
     FieldDefinition("pos.trTime", 32),
