@@ -1,5 +1,6 @@
-Early stages of a demo parsing tool written in python.
 
-Run `stats.py` for a demonstration.
+# Q3 Demo Processor
 
-*Only works on online demos at this time*
+A Python tool for parsing and processing Quake 3 demo files.
+
+Run `main.py` for ademonstration.
