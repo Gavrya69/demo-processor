@@ -1,5 +1,5 @@
 import numpy as np
-from net import defs
+from core import defs
 
 
 class GameState(): # TODO: Написать!!!!!

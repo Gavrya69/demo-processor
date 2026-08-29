@@ -1,6 +1,6 @@
-from net import defs
-from net.q3classes import Snapshot, ServerCommand, GameState
-from net.buffers import Buffer
+from core import defs
+from core.q3classes import Snapshot, ServerCommand, GameState
+from core.buffers import Buffer
 
 
 class Demo:

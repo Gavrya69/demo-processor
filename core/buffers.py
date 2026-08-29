@@ -1,5 +1,5 @@
 import struct
-from net import huffman, defs
+from core import huffman, defs
 
 
 class Buffer:
