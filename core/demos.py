@@ -1,11 +1,11 @@
 from core import defs
-from core.q3classes import Snapshot, ServerCommand, GameState
+from core.q3classes import Snapshot
 from core.buffers import Buffer
 
 
 class Demo:
     def __init__(self, filepath, gamestate, snapshots, servercommands):
-        self.filepath = filepath
+        self.filepath = filepath # TODO: убрать
         self.snapshots = snapshots
         self.servercommands = servercommands
         self.gamestate = gamestate
@@ -17,9 +17,6 @@ class Demo:
     
     
     def get_data(self):
-        if self.gamestate is None:
-            return
-        
         data = {"game": {}, "client": {}, "raw": {}}
         for key, val in self.gamestate["configs"].items():
             s = val.decode("utf-8", errors="ignore").rstrip("\x00")
@@ -106,6 +103,8 @@ class DemoParser:
             delta_num=delta_num
         )
         
+        self.current_server_time = server_time
+        
         snapshot_to_delta_from = None
         
         if delta_num != 0:
@@ -171,7 +170,7 @@ class DemoParser:
             if buffer.read_bit("persistent_changed"):
                 bits = buffer.read_bits(16, "persistent_bits")
                 persistent_bits = {}
-                changed = False # WTF: А для чего?
+                changed = False # WTF: ???
                 for i in range(16):
                     if bits & (1 << i):
                         if i == 9:
@@ -294,6 +293,7 @@ class DemoParser:
         
         return {
             "sequence": command_sequence,
+            "server_time": self.current_server_time,
             "command": command
         }
     
@@ -343,7 +343,7 @@ class DemoParser:
             yield sequence, buffer
     
     
-    def parse(self):
+    def parse(self): # IDEA: добавить логирование
         self.file = open(self.filepath, 'rb')
         
         gamestate = None

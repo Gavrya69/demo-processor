@@ -2,30 +2,24 @@ import numpy as np
 from core import defs
 
 
-class GameState(): # TODO: Написать!!!!!
-    def __init__(self,):
-        return
-
-
 class Snapshot():
     def __init__(
         self, 
         server_time=None, 
         delta_num=None, 
         sequence=None, 
-        player_state=None, 
-        entity_state=None
+        player_state=None
     ):
         self.servertime = server_time
         self.delta_num = delta_num
         self.sequence = sequence
         self.playerstate = player_state
-        self.entitystate = entity_state
+        
         self.previous_snapshot = None
         self.next_snapshot = None
     
     
-    def get_ps_val(self, key: str):
+    def get_ps_val(self, key: str): # WTF: А надо ли? Если есть поле playerstate
         return self.playerstate.get(key, None)
     
     
@@ -37,8 +31,8 @@ class Snapshot():
         return self.playerstate
     
     
-    def get_es_all(self): #FIXME: Тут было self.entities
-        return self.entitystate
+    def get_es_all(self):
+        return self.entities
     
     
     def get_stat(self, num: int):
@@ -109,7 +103,7 @@ class Snapshot():
         return wish_dir
     
     
-    def get_vel(self): # TODO: Добавить get_vel_xy
+    def get_vel(self):
         return [
             self.playerstate.get('velocity[0]', 0), 
             self.playerstate.get('velocity[1]', 0),
@@ -134,7 +128,7 @@ class Snapshot():
         return round((vel_x**2 + vel_y**2)**0.5)
     
     
-    def get_time(self): # TODO: Потестить
+    def get_df_time(self): # TODO: Потестить
         try:
             timer = self.playerstate['time']
         except KeyError:
@@ -179,8 +173,3 @@ class Snapshot():
     
     def is_checkpoint(self): # TODO: Написать
         return
-
-
-class ServerCommand(): # TODO: ЧТО ЭТО ВООБЩЕ? РАЗОБРАТЬСЯ!
-    def __init__(self, command):
-        self.command_type = None
