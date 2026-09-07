@@ -1,6 +1,6 @@
 import numpy as np
 from core import defs
-from core.utils import get_map_name_checksum, get_uncolored_text
+from core.utils import get_map_name_checksum
 
 
 class Snapshot():
@@ -221,4 +221,3 @@ class ServerCommand:
         self.sequence = sequence
         self.server_time = server_time
         self.command = command.decode("utf8", errors="ignore").rstrip("\0")
-        self.uncolored_command = get_uncolored_text(self.command)
