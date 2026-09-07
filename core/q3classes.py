@@ -5,18 +5,21 @@ from core import defs
 class Snapshot():
     def __init__(
         self, 
+        sequence=None, 
         server_time=None, 
         delta_num=None, 
-        sequence=None, 
-        player_state=None
+        playerstate=None
     ):
-        self.servertime = server_time
-        self.delta_num = delta_num
         self.sequence = sequence
-        self.playerstate = player_state
+        self.server_time = server_time
+        self.delta_num = delta_num
+        self.playerstate = playerstate
         
         self.previous_snapshot = None
         self.next_snapshot = None
+        
+        self.time = 0
+        self.time_error = 0
     
     
     def get_ps_val(self, key: str): # WTF: А надо ли? Если есть поле playerstate

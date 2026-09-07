@@ -4,11 +4,16 @@ import json
 from core.demos import DemoParser
 
 DEMOPATH = r".\files\palmslane[mdf.cpm]00.06.312(Arcaon.Sweden).dm_68"
-DEMOPATH = r".\files\sodomia[mdf.cpm]00.39.232(AWNachos.Russia).dm_68"
-DEMOPATH = r"C:\MY\Games\DEFRAG\Q3 DeFRaG\defrag\demos\123.dm_68"
 # DEMOPATH = r".\files\sodomia[mdf.cpm]00.39.232(AWNachos.Russia).dm_68"
-DEMOPATH = r"C:\MY\Games\DEFRAG\Q3 DeFRaG\defrag\demos\st1[df.vq3]00.07.776(Nachos.Russia).dm_68"
+# DEMOPATH = r"C:\MY\Games\DEFRAG\Q3 DeFRaG\defrag\demos\123.dm_68"
+# DEMOPATH = r".\files\sodomia[mdf.cpm]00.39.232(AWNachos.Russia).dm_68"
+# DEMOPATH = r"C:\MY\Games\DEFRAG\Q3 DeFRaG\defrag\demos\st1[df.vq3]00.07.808(Nachos.Russia).dm_68"
+# DEMOPATH = r"C:\MY\Games\DEFRAG\Q3 DeFRaG\defrag\demos\j4n_pgb[df.cpm]00.11.856(Nachos.Russia).dm_68"
+# DEMOPATH =r"C:\MY\Games\DEFRAG\Q3 DeFRaG\defrag\demos\st1[df.cpm]00.20.312(Nachos.Russia).dm_68"
+# DEMOPATH = r"C:\MY\Games\DEFRAG\Q3 DeFRaG\defrag\demos\ssuvgrobi[mdf.cpm]00.03.200(EBACHOS.Russia).dm_68"
+# DEMOPATH = r"C:\MY\Games\DEFRAG\Q3 DeFRaG\defrag\demos\MY\d\dart-challenge2[df.cpm]01.59.952(Nachos.Russia).dm_68"
 # DEMOPATH = r"C:\MY\Games\DEFRAG\Q3 DeFRaG\defrag\demos\Collection\DEFRAG WORLD CUP\DFWC 2017\Round 7\cpm\dfwc2017-7[df.cpm]00.39.040(kin3.Belarus)_8408.dm_68"
+# DEMOPATH = r"C:\MY\Games\DEFRAG\Q3 DeFRaG\defrag\demos\MY\j\j4n_pgb3[df.cpm]00.07.920(Nachos.Russia).dm_68"
 # DEMOPATH =r"C:\MY\Games\DEFRAG\Q3 DeFRaG\defrag\demos\MY\t\thetower[mdf.cpm]00.02.672(EBACHOS.Russia).dm_68"
 
 def parse_demo(demo_path: str):
@@ -19,15 +24,15 @@ def parse_demo(demo_path: str):
     
     for sp in demo.snapshots.values():
         data.append({
-            "ServerTime": sp.servertime,
+            "ServerTime": sp.server_time,
             # "PlayerState": sp.get_ps_all(),
             "Position": sp.get_pos(), 
             # "Velocity": sp.get_vel(), 
             # "ViewAngles": sp.get_view_angles(),
             "Presses": sp.get_presses()
         })
-        # print(sp.servertime, sp.is_jump(), sp.get_ps_all().get("pm_time"))
-        # print(sp.servertime, sp.get_df_time())
+        # print(sp.server_time, sp.is_jump(), sp.get_ps_all().get("pm_time"))
+        print(sp.server_time, sp.time)
     
     file_name = os.path.splitext(os.path.basename(demo_path))[0]
     with open(f"{file_name}.json", "w") as f:

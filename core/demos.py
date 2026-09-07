@@ -5,38 +5,18 @@ from core.buffers import Buffer
 
 class Demo:
     def __init__(self, filepath, gamestate, snapshots, servercommands):
-        self.filepath = filepath # TODO: убрать
+        self.filepath = filepath
+        self.gamestate = gamestate
         self.snapshots = snapshots
         self.servercommands = servercommands
-        self.gamestate = gamestate
         
-        self.data = self.get_data()
-        self.client_number = self.gamestate["client_number"]
-        self.map_name = self.data["client"]["mapname"]
+        self.client_number = gamestate.client_number
         self.players = self.get_players()
-    
-    
-    def get_data(self):
-        data = {"game": {}, "client": {}, "raw": {}}
-        for key, val in self.gamestate["configs"].items():
-            s = val.decode("utf-8", errors="ignore").rstrip("\x00")
-            if s.startswith("\\"):
-                s = s[1:]
-            parts = s.split("\\")
-            
-            if key == 0:
-                data["client"] = dict(zip(parts[0::2], parts[1::2]))
-            elif key == 1:
-                data["game"] = dict(zip(parts[0::2], parts[1::2]))
-            else:
-                data["raw"][key] = val
         
-        return data
-    
     
     def get_players(self):
         players = {}
-        for key, val in self.data["raw"].items():
+        for key, val in self.gamestate.configs.items():
             s = val.decode("utf-8", errors="ignore").rstrip("\x00")
             if s.startswith("\\"):
                 s = s[1:]
@@ -61,7 +41,7 @@ class Demo:
     def get_weapons(self, client_id=None):
         weap_list = []
         
-        if client_id is None or (client_id) == self.gamestate["client_number"]:
+        if client_id is None or (client_id) == self.gamestate.client_number:
             for snapshot in self.snapshots.values():
                 weap = snapshot.playerstate.get('weapon', None)
                 if weap and (weap not in weap_list):
@@ -87,10 +67,13 @@ class DemoParser:
     def __init__(self, filepath):
         self.filepath = filepath
         
+        self.gamestate = None
+        self.servercommands = []
         self.baselines = {}
         self.snapshots = {}
         
         self.last_snapshot = None
+        self.current_server_time = 0
     
     
     def parse_snapshot(self, sequence, buffer):
@@ -121,6 +104,15 @@ class DemoParser:
         
         snapshot.playerstate = self.parse_playerstate(buffer, snapshot_to_delta_from)
         snapshot.entities = self.parse_entities(buffer, snapshot_to_delta_from)
+        
+        snapshot.time, snapshot.time_error = get_defrag_time(
+            playerstate=snapshot.playerstate,
+            snap_server_time=snapshot.server_time,
+            df_version=self.gamestate.df_version,
+            map_name_checksum=self.gamestate.map_name_checksum,
+            is_online=self.gamestate.is_online,
+            is_cheats_on=self.gamestate.is_cheats_on,
+        )
         
         self.snapshots[sequence & defs.PACKET_MASK] = snapshot
         
@@ -157,24 +149,16 @@ class DemoParser:
             if buffer.read_bit("stats_changed"):
                 bits = buffer.read_bits(16, "stats_bits")
                 stats = playerstate.get('stats', {}).copy()
-                time = 0
                 for i in range(16):
                     if bits & (1 << i):
-                        if i == 8:
-                            time = buffer.read_bits(16, f"stats_bit_{i}")
-                        else:
-                            stats[str(i)] = buffer.read_bits(16, f"stats_bit_{i}")
+                        stats[str(i)] = buffer.read_bits(16, f"stats_bit_{i}")
                 playerstate['stats'] = stats
-                playerstate['time'] = time
             
             if buffer.read_bit("persistent_changed"):
                 bits = buffer.read_bits(16, "persistent_bits")
                 persistent_bits = {}
-                changed = False # WTF: ???
                 for i in range(16):
                     if bits & (1 << i):
-                        if i == 9:
-                            changed = True
                         persistent_bits[str(i)] = buffer.read_bits(16, "persistent_bit_{}".format(i))
                 playerstate['persistent_bits'] = persistent_bits
             
@@ -229,11 +213,7 @@ class DemoParser:
     def parse_gamestate(self, buffer):
         server_command_sequence = buffer.read_bits(32)
         
-        gamestate = {
-            "client_number": "",
-            "configs": {},
-        }
-        
+        configs = {}
         self.baselines = {}
         
         while True:
@@ -245,7 +225,7 @@ class DemoParser:
             elif gamestate_op == 3: # configstring
                 i = buffer.read_bits(16, "configstring_index")
                 config_string = buffer.read_string("configstring")
-                gamestate['configs'][i] = config_string
+                configs[i] = config_string
                 
             elif gamestate_op == 4:  # baseline
                 entity_number = buffer.read_bits(defs.GENTITYNUM_BITS, "entity_number")
@@ -254,10 +234,15 @@ class DemoParser:
             else:
                 raise Exception(f"Unknown gamestate op: {gamestate_op}")
         
-        gamestate["client_number"] = buffer.read_bits(32, "client_number")
-        self.checksum_feed = buffer.read_bits(32, "checksum_feed")
+        client_number = buffer.read_bits(32, "client_number")
+        checksum_feed = buffer.read_bits(32, "checksum_feed")
         
-        return gamestate
+        return GameState(
+            configs=configs,
+            client_number=client_number,
+            checksum_feed=checksum_feed,
+            baselines=self.baselines
+        )
     
     
     def read_delta_entity(self, buffer, old):
@@ -316,7 +301,9 @@ class DemoParser:
                 events.append(("servercommand", self.parse_server_command(buffer)))
             
             elif opcode == defs.SVC_GAMESTATE:
-                events.append(("gamestate", self.parse_gamestate(buffer)))
+                self.gamestate = self.parse_gamestate(buffer)
+                events.append(("gamestate", self.gamestate))
+            
             
             else:
                 raise Exception(f"Unknown opcode {opcode}")
@@ -375,3 +362,175 @@ class DemoParser:
             servercommands=servercommands,
         )
 
+
+def get_defrag_time(
+    playerstate,
+    snap_server_time,
+    df_version,
+    map_name_checksum,
+    is_online=False,
+    is_cheats_on=False,
+):
+    import math
+    MASK32 = 0xFFFFFFFF
+
+    def u32(value):
+        return value & MASK32
+
+    def shl32(value, bits):
+        return (value << bits) & MASK32
+
+    def shr32(value, bits):
+        return (value & MASK32) >> bits
+
+    stats = playerstate.get("stats", {})
+
+    # C#:
+    # int time = shl32(ps.stats[7], 0x10) | (ps.stats[8] & 0xffff);
+    time = (
+        shl32(stats.get("7", 0), 16)
+        | (stats.get("8", 0) & 0xFFFF)
+    )
+
+    if time == 0:
+        return 0, False
+
+    # C#:
+    # if ((client.isOnline && df_ver != 190) ||
+    #     (df_ver >= 19112 && client.isCheatsOn))
+    if (
+        (is_online and df_version != 190)
+        or
+        (df_version >= 19112 and is_cheats_on)
+    ):
+        return time, False
+
+    # time ^= abs(floor(origin[0])) & 0xffff
+    origin_x = playerstate.get("origin[0]", 0.0)
+    time ^= abs(math.floor(origin_x)) & 0xFFFF
+
+    # time ^= abs(floor(velocity[0])) << 16
+    velocity_x = playerstate.get("velocity[0]", 0.0)
+    time ^= shl32(abs(math.floor(velocity_x)), 16)
+
+    # time ^= stats[0] > 0 ? stats[0] & 0xff : 150
+    stat0 = stats.get("0", 0)
+    time ^= (stat0 & 0xFF) if stat0 > 0 else 150
+
+    # time ^= (movementDir & 0xf) << 28
+    movement_dir = playerstate.get("movementDir", 0)
+    time ^= shl32(movement_dir & 0xF, 28)
+
+    time = u32(time)
+
+    # Equivalent to:
+    # time[3] ^= time[2]
+    # time[2] ^= time[1]
+    # time[1] ^= time[0]
+    for i in range(0x18, 0, -8):
+        temp = (shr32(time, i) ^ shr32(time, i - 8)) & 0xFF
+
+        time = (
+            time
+            & u32(~shl32(0xFF, i))
+        ) | shl32(temp, i)
+
+        time = u32(time)
+
+    # local1c = (snap_serverTime << 2)
+    local1c = shl32(snap_server_time, 2)
+
+    # local1c += (df_ver + mapNameChecksum) << 8
+    local1c = u32(
+        local1c
+        + shl32(df_version + map_name_checksum, 8)
+    )
+
+    # local1c ^= snap_serverTime << 24
+    local1c ^= shl32(snap_server_time, 24)
+    local1c = u32(local1c)
+
+    # time ^= local1c
+    time ^= local1c
+    time = u32(time)
+
+    # local1c = time[28:32]
+    local1c = shr32(time, 28)
+
+    # local1c |= (~local1c << 4) & 0xff
+    local1c |= shl32(~local1c, 4) & 0xFF
+    local1c = u32(local1c)
+
+    # local1c |= local1c << 8
+    local1c |= shl32(local1c, 8)
+    local1c = u32(local1c)
+
+    # local1c |= local1c << 16
+    local1c |= shl32(local1c, 16)
+    local1c = u32(local1c)
+
+    # time ^= local1c
+    time ^= local1c
+    time = u32(time)
+
+    # checksum stored in bits 22..27
+    checksum = shr32(time, 0x16) & 0x3F
+
+    # actual time is lower 22 bits
+    time &= 0x3FFFFF
+
+    # calculate checksum
+    calculated = 0
+
+    for l in range(3):
+        calculated += (time >> (6 * l)) & 0x3F
+
+    # upper 4 bits
+    calculated += (time >> 0x12) & 0xF
+
+    has_error = checksum != (calculated & 0x3F)
+
+    return time, has_error
+
+
+def get_map_name_checksum(map_name):
+    return sum(map_name.lower().encode("ascii", errors="ignore")) & 0xFF
+
+
+class GameState:
+    def __init__(self, configs, client_number, checksum_feed, baselines):
+        self.configs = configs
+        self.client_number = client_number
+        self.checksum_feed = checksum_feed
+        self.baselines = baselines
+        
+        self.client = {}
+        self.game = {}
+        self.raw = {}
+        
+        self.parse_configs()
+        
+        # Defrag Settings (for time parsing)
+        self.map_name = self.client.get("mapname", "")
+        self.map_name_checksum = get_map_name_checksum(self.map_name)
+        self.df_version = int(self.client.get("defrag_vers", 0))
+        self.is_online = int(self.client.get("defrag_gametype", 0)) > 4
+        self.is_cheats_on = int(self.game.get("sv_cheats", 0)) > 0
+        
+        
+    def parse_configs(self):
+        data = {"game": {}, "client": {}, "raw": {}}
+        for key, val in self.configs.items():
+            s = val.decode("utf-8", errors="ignore").rstrip("\x00")
+            if s.startswith("\\"):
+                s = s[1:]
+            parts = s.split("\\")
+            
+            if key == 0:
+                self.client = dict(zip(parts[0::2], parts[1::2]))
+            elif key == 1:
+                self.game = dict(zip(parts[0::2], parts[1::2]))
+            else:
+                self.raw[key] = dict(zip(parts[0::2], parts[1::2]))
+        
+        return data
