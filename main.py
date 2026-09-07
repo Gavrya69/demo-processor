@@ -5,7 +5,7 @@ from core.demos import DemoParser
 
 DEMOPATH = r".\files\palmslane[mdf.cpm]00.06.312(Arcaon.Sweden).dm_68"
 # DEMOPATH = r".\files\sodomia[mdf.cpm]00.39.232(AWNachos.Russia).dm_68"
-# DEMOPATH = r"C:\MY\Games\DEFRAG\Q3 DeFRaG\defrag\demos\123.dm_68"
+DEMOPATH = r"C:\MY\Games\DEFRAG\Q3 DeFRaG\defrag\demos\111_4ity.dm_68"
 # DEMOPATH = r".\files\sodomia[mdf.cpm]00.39.232(AWNachos.Russia).dm_68"
 # DEMOPATH = r"C:\MY\Games\DEFRAG\Q3 DeFRaG\defrag\demos\st1[df.vq3]00.07.808(Nachos.Russia).dm_68"
 # DEMOPATH = r"C:\MY\Games\DEFRAG\Q3 DeFRaG\defrag\demos\j4n_pgb[df.cpm]00.11.856(Nachos.Russia).dm_68"

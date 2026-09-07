@@ -1,5 +1,6 @@
 import numpy as np
 from core import defs
+from core.utils import get_map_name_checksum, get_uncolored_text
 
 
 class Snapshot():
@@ -176,3 +177,48 @@ class Snapshot():
     
     def is_checkpoint(self): # TODO: Написать
         return
+
+
+
+class GameState:
+    def __init__(self, configs, client_number, checksum_feed, baselines):
+        self.configs = configs
+        self.client_number = client_number
+        self.checksum_feed = checksum_feed
+        self.baselines = baselines
+        
+        self.client = {}
+        self.game = {}
+        self.raw = {}
+        
+        self.parse_configs()
+        
+        # Defrag Settings (for time parsing)
+        self.map_name = self.client.get("mapname", "")
+        self.map_name_checksum = get_map_name_checksum(self.map_name)
+        self.df_version = int(self.client.get("defrag_vers", 0))
+        self.is_online = int(self.client.get("defrag_gametype", 0)) > 4
+        self.is_cheats_on = int(self.game.get("sv_cheats", 0)) > 0
+        
+        
+    def parse_configs(self):
+        for key, val in self.configs.items():
+            s = val.decode("utf-8", errors="ignore").rstrip("\x00")
+            if s.startswith("\\"):
+                s = s[1:]
+            parts = s.split("\\")
+            
+            if key == 0:
+                self.client = dict(zip(parts[0::2], parts[1::2]))
+            elif key == 1:
+                self.game = dict(zip(parts[0::2], parts[1::2]))
+            else:
+                self.raw[key] = dict(zip(parts[0::2], parts[1::2]))
+
+
+class ServerCommand:
+    def __init__(self, sequence, server_time, command):
+        self.sequence = sequence
+        self.server_time = server_time
+        self.command = command.decode("utf8", errors="ignore").rstrip("\0")
+        self.uncolored_command = get_uncolored_text(self.command)
