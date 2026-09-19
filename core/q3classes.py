@@ -31,14 +31,6 @@ class Snapshot():
         return self.entitystate.get(key, None)
     
     
-    def get_ps_all(self):
-        return self.playerstate
-    
-    
-    def get_es_all(self):
-        return self.entities
-    
-    
     def get_stat(self, num: int):
         return self.playerstate.get('stats', {}).get(num, None)
     
@@ -177,7 +169,6 @@ class Snapshot():
     
     def is_checkpoint(self): # TODO: Написать
         return
-
 
 
 class GameState:

@@ -16,17 +16,7 @@ class Demo:
     
     
     def get_players(self):
-        players = {}
-        for key, val in self.gamestate.configs.items():
-            s = val.decode("utf-8", errors="ignore").rstrip("\x00")
-            if s.startswith("\\"):
-                s = s[1:]
-            parts = s.split("\\")
-            
-            if parts[0] == "n": # "name" value (only players have it)
-                players[key] = dict(zip(parts[0::2], parts[1::2]))
-        
-        players = {(k-544): v for k, v in players.items()}
+        players = {(k-544): v for k, v in self.gamestate.raw.items() if k >= 544}
         
         for pid, pdata in players.items():
             pdata["name"] = get_uncolored_text(pdata["n"])
@@ -72,6 +62,7 @@ class DemoParser:
         self.baselines = {}
         self.snapshots = {}
         
+        self.delta_snapshots = {}
         self.last_snapshot = None
         self.current_server_time = 0
     
@@ -92,7 +83,7 @@ class DemoParser:
         
         if delta_num != 0:
             key = (sequence - delta_num) & defs.PACKET_MASK
-            snapshot_to_delta_from = self.snapshots.get(key)
+            snapshot_to_delta_from = self.delta_snapshots.get(key)
             
             if snapshot_to_delta_from and snapshot_to_delta_from.sequence != sequence - delta_num:
                 snapshot_to_delta_from = None
@@ -114,7 +105,8 @@ class DemoParser:
             is_cheats_on=self.gamestate.is_cheats_on,
         )
         
-        self.snapshots[sequence & defs.PACKET_MASK] = snapshot
+        self.snapshots[sequence] = snapshot
+        self.delta_snapshots[sequence & defs.PACKET_MASK] = snapshot
         
         snapshot.previous_snapshot = self.last_snapshot
         if self.last_snapshot:
