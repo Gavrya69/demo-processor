@@ -1,4 +1,4 @@
 .idea/
 *.pyc
 *.json
-files/*Nachos*
+files/*Nachos*.*
